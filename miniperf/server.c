@@ -45,20 +45,44 @@ void *handle_client(void *arg) {
     }
     
     // Buffer to store the incoming packet.
-    char buffer[1024];
+    char buffer[1400];
     struct sockaddr_in client_addr;
     socklen_t addr_len = sizeof(client_addr);
-    
-    // Receive one packet.
-    ssize_t received_bytes = recvfrom(udp_sock, buffer, sizeof(buffer), 0,
-                                      (struct sockaddr *)&client_addr, &addr_len);
-    if (received_bytes < 0) {
-        perror("recvfrom");
-    } else {
-        printf("UDP Receiver: Received %zd bytes.\n", received_bytes);
-        printf("%s\n",buffer);
+
+
+    struct timespec start, curr,end;
+
+
+    unsigned long long int totalbytes_recv=0;
+
+    // Start tracking time by getting the current time from CLOCK_MONOTONIC
+    if (clock_gettime(CLOCK_MONOTONIC, &start) != 0) {
+        perror("Failed to get start time");
+        exit(EXIT_FAILURE);
     }
     
+    unsigned int elapsed = 0U;
+    while(elapsed <  udp_arg->config->duration ){
+        ssize_t received_bytes = recvfrom(udp_sock, buffer, sizeof(buffer), 0,
+                                        (struct sockaddr *)&client_addr, &addr_len);
+        if (received_bytes < 0) {
+            // perror("recvfrom");
+            printf("RECEIVED < 0 BYTES\n");
+        } else {
+            //TODO: Account for header size
+            totalbytes_recv +=received_bytes;
+            // printf("UDP Receiver: Received %zd bytes.\n", received_bytes);
+            // printf("%s\n",buffer);
+        }
+        // Calculate the elapsed time in seconds
+        if (clock_gettime(CLOCK_MONOTONIC, &curr) != 0) {
+            perror("Failed to get start time");
+            exit(EXIT_FAILURE);
+        }
+        elapsed = (curr.tv_sec - start.tv_sec) +
+              (curr.tv_nsec - start.tv_nsec) / 1e9;
+    }
+    printf("Total Bytes received:%llu\n",totalbytes_recv);
     close(udp_sock);
     pthread_exit(NULL);
 }
@@ -96,20 +120,33 @@ int server_main(const config_t *config) {
     }
     
     printf("Server listening on %s:%d\n", config->ip_addr, config->port);
+    config_t *sender_config = malloc(sizeof(config_t));
     
     // Accept and handle incoming TCP connections in separate threads.
-    while (1) {
+    // while (1) {
         int *client_sock = malloc(sizeof(int));
         if (!client_sock) {
             perror("malloc");
-            continue;
+            // continue;
         }
         *client_sock = accept(tcp_sock, (struct sockaddr *)&client_addr, &addr_len);
         if (*client_sock < 0) {
             perror("accept");
             free(client_sock);
-            continue;
+            // continue;
         }
+
+        //Receive initial data from TCP connection (flags)
+        ssize_t bytes_received = recv(*client_sock, sender_config, sizeof(config_t), 0);
+        if (bytes_received < 0) {
+            perror("recv failed");
+        } else {
+            printf("Received %zd bytes with duration of connection: %d\n", bytes_received, sender_config->duration );
+        }
+
+
+
+
         udp_thread_arg_t* udp_arg = malloc(sizeof(udp_thread_arg_t));
         udp_arg->config = (config_t *)config;
         udp_arg->socket_num = *client_sock;
@@ -117,10 +154,11 @@ int server_main(const config_t *config) {
             perror("pthread_create");
             close(*client_sock);
             free(client_sock);
-            continue;
+            // continue;
         }
-        pthread_detach(thread_id);
-    }
+        // pthread_detach(thread_id);
+        pthread_join(thread_id, NULL);
+    // }
     
     close(tcp_sock);
     return 0;

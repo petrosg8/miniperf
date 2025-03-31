@@ -4,7 +4,9 @@
 #include <string.h>
 #include <pthread.h>
 #include <arpa/inet.h>
+#include <time.h>
 #include "network.h"
+
 
 // // Structure to pass parameters to each UDP stream thread.
 // typedef struct {
@@ -15,6 +17,7 @@
 
 // UDP stream thread: sends UDP packets based on client parameters.
 void *udp_stream_thread(void *arg) {
+    struct timespec start, curr,end;
     udp_thread_arg_t *udp_arg = (udp_thread_arg_t *)arg;
     // TODO: Create a UDP socket.
     // TODO: Implement throttling:
@@ -40,23 +43,38 @@ void *udp_stream_thread(void *arg) {
     server_udp_addr.sin_addr.s_addr = inet_addr(udp_arg->config->ip_addr);
 
     // Prepare a 50-byte packet (filled with 'A's for demonstration).
-    char packet[50];
+    char packet[1400];
     memset(packet, 'A', sizeof(packet));
 
-    // (Optional) You can include a header with a sequence number if desired.
-    // For now, we are just sending a raw 50-byte packet.
-
-    // Send the packet.
-    ssize_t sent_bytes = sendto(udp_sock, packet, sizeof(packet), 0,
-                                (struct sockaddr *)&server_udp_addr, sizeof(server_udp_addr));
-    if (sent_bytes < 0) {
-        perror("sendto");
-    } else {
-        printf("UDP stream thread %d: Sent %zd bytes.\n", udp_arg->thread_id, sent_bytes);
+    sleep(1);
+    // Start tracking time by getting the current time from CLOCK_MONOTONIC
+    if (clock_gettime(CLOCK_MONOTONIC, &start) != 0) {
+        perror("Failed to get start time");
+        exit(EXIT_FAILURE);
     }
+    unsigned int elapsed = 0U;
+    while(elapsed <  udp_arg->config->duration ){
+        // Send the packet.
+        
+        
+        ssize_t sent_bytes = sendto(udp_sock, packet, sizeof(packet), 0,
+                                    (struct sockaddr *)&server_udp_addr, sizeof(server_udp_addr));
+        if (sent_bytes < 0) {
+            perror("sendto");
+        } else {
+            // printf("UDP stream thread %d: Sent %zd bytes.\n", udp_arg->thread_id, sent_bytes);
+        }        
 
+        // Calculate the elapsed time in seconds
+        if (clock_gettime(CLOCK_MONOTONIC, &curr) != 0) {
+            perror("Failed to get start time");
+            exit(EXIT_FAILURE);
+        }
+        elapsed = (curr.tv_sec - start.tv_sec) +
+              (curr.tv_nsec - start.tv_nsec) / 1e9;
+    }
     close(udp_sock);
-
+    
 
     pthread_exit(NULL);
 }
@@ -87,9 +105,16 @@ int client_main(const config_t *config) {
     
     printf("Connected to server %s:%d via TCP.\n", config->ip_addr, config->port);
     
+    sleep((unsigned int)1);
+
     // TODO: Exchange TCP signaling messages to:
     //   - Inform the server about experiment parameters (UDP packet size, number of streams, etc.)
     //   - Signal the start of the experiment.
+    ssize_t bytes_sent = send(tcp_sock, config, sizeof(config_t), 0);
+    if (bytes_sent < 0) {
+        perror("send failed");
+    }
+
     
     // Create threads for parallel UDP streams.
     pthread_t *threads = malloc(config->num_streams * sizeof(pthread_t));
