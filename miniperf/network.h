@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <sys/time.h>
 #include <netinet/in.h>
-
+#include <fcntl.h>
 
 // Global configuration structure holding command-line parameters.
 typedef struct config_t {
@@ -36,6 +36,7 @@ typedef struct {
 
 extern udp_thread_arg_t udp_arg;
 
+
 // --- TCP Control Channel Definitions ---
 
 // Define message types for the TCP signaling channel.
@@ -58,6 +59,8 @@ typedef struct {
 // UDP packet header to include a sequence number for packet loss measurement.
 typedef struct {
     uint32_t seq_num;    // Sequence number for packet ordering/loss detection
+    struct timespec sent_time;
+    // time_t time_telapsed;
     // You can add additional fields if needed.
 } udp_header_t;
 

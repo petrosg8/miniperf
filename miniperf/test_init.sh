@@ -9,25 +9,30 @@
 # Make sure this script is executable (chmod +x run_miniperf.sh) and that
 # ./miniperf is in your PATH or in the current directory.
 
-ITERATIONS=20
+# ITERATIONS=20
 
-for i in $(seq 1 $ITERATIONS); do
-    echo "Iteration $i: Starting server and client..."
+# for i in $(seq 1 $ITERATIONS); do
+    echo "Starting server and client..."
+
+    iftop -t -s 30 -i lo0 > iftop_output.txt &
+
+    sleep 3
 
     # Start server in background and capture its process ID.
     ./miniperf -s -p 5555 &
-    SERVER_PID=$!
+    SERVER_PID=$! &
 
     # Allow a brief pause to ensure the server has time to initialize.
     
-
     # Run the client (this runs in the foreground).
-    ./miniperf -c -p 5555
+    ./miniperf -c -p 5555 -t 20
+
+    
 
     # Wait for the server process to finish before starting the next iteration.
     wait $SERVER_PID
  
     # Optional: add a brief pause before the next iteration.
-done
+# done
 
-echo "Completed $ITERATIONS iterations."
+echo "Completed."
