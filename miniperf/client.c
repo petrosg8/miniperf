@@ -26,7 +26,7 @@ static void sleep_ms(long milliseconds) {
     nanosleep(&req, NULL);
 }
 void *udp_stream_thread(void *arg) {
-    struct timespec start, curr , end;
+    struct timespec start, curr;
     udp_thread_arg_t *udp_arg = (udp_thread_arg_t *)arg;
     // TODO: Create a UDP socket.
     // TODO: Implement throttling:
@@ -133,12 +133,13 @@ void *udp_stream_thread(void *arg) {
             // printf("UDP stream thread %d: Sent %zd bytes.\n", udp_arg->thread_id, sent_bytes);
         }        
 
+        // sleep_ms(200);
+
         // Calculate the elapsed time in seconds
         if (clock_gettime(CLOCK_MONOTONIC, &curr) != 0) {
             perror("Failed to get start time");
             exit(EXIT_FAILURE);
         }
-        sleep_ms(1);
         elapsed = (curr.tv_sec - start.tv_sec) +
               (curr.tv_nsec - start.tv_nsec) / 1e9;
     }
